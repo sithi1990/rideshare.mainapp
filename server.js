@@ -189,6 +189,9 @@ apiRoutes.put('/users/type', function (req, res) {
 		}
 
 	});
+
+   
+});
 	
 apiRoutes.post('/ridehistory', function (req, res) {
     
