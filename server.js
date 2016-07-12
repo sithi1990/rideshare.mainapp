@@ -8,13 +8,14 @@ var bodyParser  = require('body-parser');
 var morgan      = require('morgan');
 var mongoose    = require('mongoose');
 var HttpClient = require('node-rest-client').Client;
-var httpClient = new HttpClient();
 var urbanAirshipClient = require("./urban_airship_client");
+var httpClient = new HttpClient();
+
 var jwt    = require('jsonwebtoken'); // used to create, sign, and verify tokens
 var config = require('./config'); // get our config file
 var UserCoordinate   = require('./app/models/user_coordinate'); // get our mongoose model
 var RideHistory = require('./app/models/ride_history.js'); // RideHistory mongoose model
-  
+
 // =======================
 // configuration =========
 // =======================
@@ -63,6 +64,7 @@ apiRoutes.use(function(req, res, next) {
 
 	});
 
+	
 });
 
  apiRoutes.get('/', function(req, res) {
@@ -81,7 +83,8 @@ apiRoutes.post('/saveuserdata', function(req, res) {
 		userCoordinate.lastName= req.body.lastName;
 		userCoordinate.longitude= req.body.longitude;
 		userCoordinate.latitude= req.body.latitude;
-		
+		userCoordinate.userType = req.body.userType;
+		userCoordinate.mobileNo = req.body.mobileNo;
 		userCoordinate.save(function(err) {
 			if (err) res.json({ success: false, message:err });
 
@@ -99,7 +102,9 @@ apiRoutes.post('/saveuserdata', function(req, res) {
 			firstName:req.userInfo.firstName,
 			lastName:req.userInfo.lastName,
 			longitude: req.body.longitude,
-			latitude: req.body.latitude
+			latitude: req.body.latitude,
+			userType: req.body.userType,
+			mobileNo: req.body.mobileNo
 		});
 		
 		newUserCoordinate.save(function(err) {
@@ -114,6 +119,27 @@ apiRoutes.post('/saveuserdata', function(req, res) {
 	
   });
 });  
+
+/* apiRoutes.post('/updatecoordinates', function(req, res) {
+  UserCoordinate.findOne({userName : req.userInfo.userName}, function(err, userCoordinate) {
+  
+	if (err) res.json({ success: false, message:err });
+    userCoordinate.name=req.userInfo.name,
+	userCoordinate.longitude= req.body.longitude;
+	userCoordinate.latitude= req.body.latitude;
+
+	userCoordinate.save(function(err) {
+		if (err) res.json({ success: false, message:err });
+
+		console.log('Coordinate saved successfully');
+		io.emit('coordinate_changed', "Changed");
+		res.json({ success: true });
+	});
+	
+  });
+});   */ 
+
+
 
 apiRoutes.get('/selectedusercoordinate', function(req, res) {
 
@@ -134,7 +160,9 @@ apiRoutes.get('/selectedusercoordinate', function(req, res) {
 				userData.firstName=userCoordinate.firstName;
 				userData.lastName=userCoordinate.lastName;
 				userData.longitude=userCoordinate.longitude;
-				userData.latitude=userCoordinate.latitude;
+				userData.latitude = userCoordinate.latitude;
+				userData.mobileNo = userCoordinate.mobileNo;
+				userData.userType = userCoordinate.userType;
 				res.json({ userCoordinate: userData, success: true });
 			}
 			
@@ -159,13 +187,15 @@ apiRoutes.get('/usercoordinates', function(req, res) {
 				userData.firstName=userCoordinate.firstName;
 				userData.lastName=userCoordinate.lastName;
 				userData.longitude=userCoordinate.longitude;
-				userData.latitude=userCoordinate.latitude;
+				userData.latitude = userCoordinate.latitude;
+				userData.mobileNo = userCoordinate.mobileNo;
+				userData.userType = userCoordinate.userType;
 				userDatas.push(userData);
 		});
 		res.json({ userCoordinates: userDatas, success: true });
 	});
 
-});   
+});
 
 apiRoutes.put('/users/type', function (req, res) {
 	
@@ -192,24 +222,54 @@ apiRoutes.put('/users/type', function (req, res) {
 
    
 });
+
+apiRoutes.get('/users/:queryString', function (req, res) {
 	
+	var name = req.query.filter;
+	var value = req.params.queryString;
+	var query = {};
+	query[name] = value;
+
+	UserCoordinate.find(query, function (err, userCoordinates) {
+		
+		if (err) res.json({ success: false, message: err });
+		
+		var userDatas = new Array();
+		userCoordinates.forEach(function (userCoordinate) {
+			
+			var userData = {};
+			userData.userName = userCoordinate.userName;
+			userData.email = userCoordinate.email;
+			userData.firstName = userCoordinate.firstName;
+			userData.lastName = userCoordinate.lastName;
+			userData.longitude = userCoordinate.longitude;
+			userData.latitude = userCoordinate.latitude;
+			userData.mobileNo = userCoordinate.mobileNo;
+			userData.userType = userCoordinate.userType;
+			userDatas.push(userData);
+		});
+		res.json({ userCoordinates: userDatas, success: true });
+	});
+
+});
+
 apiRoutes.post('/ridehistory', function (req, res) {
-    
-    var newRideHistory = new RideHistory({
-        userName: req.userInfo.userName,
-        driverUserName: req.body.driverUserName,
-        requestedTime: new Date(),
-        requestStatus: 1,
-        sourseName: req.body.sourseName,
-        destinationName: req.body.destinationName,
-        sourceLongitude: req.body.sourceLongitude,
-        sourceLatitude: req.body.sourceLatitude,
-        destinationLongitude: req.body.destinationLongitude,
-        destinationLatitude: req.body.destinationLatitude
-    });
-    
-    newRideHistory.save(function (err,saved) {
-        if (err) res.json({ success: false, message: err });
+	
+	var newRideHistory = new RideHistory({
+		userName: req.userInfo.userName,
+		driverUserName: req.body.driverUserName,
+		requestedTime: new Date(),
+		requestStatus: 1,
+		sourseName: req.body.sourseName,
+		destinationName: req.body.destinationName,
+		sourceLongitude: req.body.sourceLongitude,
+		sourceLatitude: req.body.sourceLatitude,
+		destinationLongitude: req.body.destinationLongitude,
+		destinationLatitude: req.body.destinationLatitude
+	});
+	
+	newRideHistory.save(function (err, saved) {
+		if (err) res.json({ success: false, message: err });
 		
 		var notificationData = {};
 		notificationData.driverUserName = saved.driverUserName;
@@ -224,10 +284,10 @@ apiRoutes.post('/ridehistory', function (req, res) {
 		urbanAirshipClient.sendNotification(notificationData, function (notificationSentStatus) {
 			console.log(notificationSentStatus.message);
 		});
-
-        console.log('Added new history item successfully');
-        res.json({ success: true, id : saved._id });
-    });
+		
+		console.log('Added new history item successfully');
+		res.json({ success: true, id : saved._id });
+	});
 
 });
 
@@ -237,7 +297,7 @@ apiRoutes.get('/ridehistory/:queryString', function (req, res) {
 	var value = req.params.queryString;
 	var query = {};
 	query[name] = value;
-
+	
 	RideHistory.find(query, function (err, rideHistoryItems) {
 		
 		if (err) res.json({ success: false, message: err });
@@ -264,7 +324,7 @@ apiRoutes.put('/ridehistory/status/:id', function (req, res) {
 		}
 		else {
 			rideHistoryItem.requestStatus = req.body.status;
-
+			
 			rideHistoryItem.save(function (err) {
 				if (err) res.json({ success: false, message: err });
 				
@@ -281,3 +341,10 @@ apiRoutes.put('/ridehistory/status/:id', function (req, res) {
 
 // apply the routes to our application with the prefix /api
 app.use('/api', apiRoutes);
+
+
+/* io.on('connection', function (socket) {
+  socket.on('hi', function(msg){
+    io.emit('hinew', msg);
+  });
+}); */
